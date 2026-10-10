@@ -57,7 +57,7 @@ button{cursor:pointer;border:0;border-radius:10px;font-weight:700;font-size:.95r
   <p class="sub">Track tonight's players, buy-ins and winnings.</p>
 
   <div class="panel stack">
-    <label class="lbl" for="stack">Buy-In Stack</label>
+    <label class="lbl" for="stack">Game Buy-In</label>
     <span class="money"><span>$</span><input id="stack" type="number" min="0" step="5" value="50"></span>
   </div>
 
@@ -73,7 +73,7 @@ button{cursor:pointer;border:0;border-radius:10px;font-weight:700;font-size:.95r
   <div id="list"></div>
 
   <div class="panel submit">
-    <button class="btn big" id="submitBtn">Submit game &amp; download game.json</button>
+    <button class="btn big" id="submitBtn">Submit Game</button>
     <div class="status" id="status"></div>
     <div class="tools"><span id="gameCount"></span>
       <label class="link">Load existing game.json<input type="file" id="importFile" accept=".json,application/json" hidden></label>
@@ -121,7 +121,7 @@ function submitGame(){
     results: active.map(p => ({
       player_id: p.id,
       player: p.name,
-      buyin: Number(p.buyIn) || 0,
+      buyin: buyInFor(p),
       winnings: Number(p.winnings) || 0,
       handicap: computeHandicap(p)
     }))
@@ -132,24 +132,49 @@ function submitGame(){
   save(); render(); updateGameCount(); download();
   setStatus(`Game ${nextId} saved (${active.length} players). game.json downloaded.`);
 }
+// Add any players found in the games that aren't already in the list
+function addPlayersFromGames(){
+  games.forEach(g => (g.results||[]).forEach(r => {
+    if(r.player_id && !players.some(p=>p.id===r.player_id))
+      players.push({id:r.player_id, name:r.player, playing:false, buyIn:'', winnings:''});
+  }));
+}
+function applyGames(d){
+  games = d; addPlayersFromGames(); save(); render(); updateGameCount();
+}
+// Auto-load game.json sitting next to this page (works when served over http/https)
+async function autoLoad(){
+  try{
+    const res = await fetch('game.json', {cache:'no-store'});
+    if(!res.ok) return;
+    const d = await res.json();
+    if(Array.isArray(d) && d.length >= games.length){
+      applyGames(d);
+      setStatus(`Loaded ${d.length} games and ${players.length} players from game.json.`);
+    }
+  }catch(e){}
+}
 function importGames(file){
   const r = new FileReader();
   r.onload = () => {
     try{
       const d = JSON.parse(r.result);
       if(!Array.isArray(d)) throw new Error('not an array');
-      games = d; save(); updateGameCount();
-      setStatus(`Loaded ${d.length} games from file.`);
+      applyGames(d);
+      setStatus(`Loaded ${d.length} games and ${players.length} players from file.`);
     }catch(e){ setStatus('That file is not a valid game.json.', true); }
   };
   r.readAsText(file);
 }
 
 // ---- HANDICAP FORMULA (placeholder — replace once defined) ----
-// Currently: net result (winnings − buy-in) measured in buy-in stacks.
+// Handicap is $0 for everyone for now.
 function computeHandicap(p){
-  const net = (Number(p.winnings)||0) - (Number(p.buyIn)||0);
-  return stack > 0 ? Math.round((net / stack) * 10) / 10 : 0;
+  return 0;
+}
+// Default buy-in = Game Buy-In + handicap, unless the player's box was edited
+function buyInFor(p){
+  return p.buyIn !== '' ? (Number(p.buyIn)||0) : stack + computeHandicap(p);
 }
 
 const $ = id => document.getElementById(id);
@@ -162,15 +187,15 @@ function render(){
     list.innerHTML = '<div class="empty">No players yet — add your first one above.</div>';
   } else {
     list.innerHTML = players.map(p => {
-      const net = (Number(p.winnings)||0) - (Number(p.buyIn)||0);
+      const net = (Number(p.winnings)||0) - buyInFor(p);
       const h = computeHandicap(p);
       return `<div class="player ${p.playing?'':'off'}" data-id="${p.id}">
         <input class="chk" type="checkbox" data-f="playing" ${p.playing?'checked':''} aria-label="Playing: ${esc(p.name)}">
         <div class="name">${esc(p.name)}<span class="hc" title="Handicap">HC ${h>0?'+':''}${h}</span></div>
         <button class="ghost" data-del title="Remove player" aria-label="Remove ${esc(p.name)}">✕</button>
         <div class="fields">
-          <div><label>Buy-in</label><span class="money"><span>$</span><input type="number" step="any" data-f="buyIn" placeholder="${stack}" value="${p.buyIn}"></span></div>
-          <div><label>Winnings</label><span class="money"><span>$</span><input type="number" step="any" data-f="winnings" placeholder="0" value="${p.winnings}"></span></div>
+          <div><label>Buy-in</label><span class="money"><span>$</span><input type="number" step="5" data-f="buyIn" value="${buyInFor(p)}"></span></div>
+          <div><label>Winnings</label><span class="money"><span>$</span><input type="number" step="5" data-f="winnings" placeholder="0" value="${p.winnings}"></span></div>
         </div>
         <div class="net">Net: <b class="${net>0?'pos':net<0?'neg':''}" data-net>${fmt(net)}</b></div>
       </div>`;
@@ -203,8 +228,6 @@ list.addEventListener('change', e => {
   if(e.target.dataset.f !== 'playing') return;
   const p = players.find(x=>x.id===e.target.closest('.player').dataset.id);
   p.playing = e.target.checked;
-  // pre-fill buy-in with the stack when someone joins the game
-  if(p.playing && p.buyIn==='') p.buyIn = stack;
   save(); render();
 });
 // update values without re-rendering (keeps input focus)
@@ -214,7 +237,7 @@ list.addEventListener('input', e => {
   const row = e.target.closest('.player');
   const p = players.find(x=>x.id===row.dataset.id);
   p[f] = e.target.value;
-  const net = (Number(p.winnings)||0) - (Number(p.buyIn)||0);
+  const net = (Number(p.winnings)||0) - buyInFor(p);
   const h = computeHandicap(p);
   const el = row.querySelector('[data-net]');
   el.textContent = fmt(net); el.className = net>0?'pos':net<0?'neg':'';
@@ -226,9 +249,11 @@ $('submitBtn').onclick = submitGame;
 $('importFile').addEventListener('change', e => { if(e.target.files[0]) importGames(e.target.files[0]); e.target.value=''; });
 
 load();
+addPlayersFromGames();
 $('stack').value = stack;
 render();
 updateGameCount();
+autoLoad();
 </script>
 </body>
 </html>
