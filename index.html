@@ -42,16 +42,23 @@ button{cursor:pointer;border:0;border-radius:10px;font-weight:700;font-size:.95r
 .net{grid-column:2 / 4;font-size:.85rem;color:var(--mute)}
 .pos{color:var(--good)}.neg{color:var(--danger)}
 .empty{text-align:center;color:var(--mute);padding:28px;border:1px dashed var(--line);border-radius:14px}
+.submit{text-align:center;margin-top:20px}
+.big{width:100%;padding:14px;font-size:1.05rem}
+.status{min-height:1.3em;margin-top:10px;font-size:.9rem;color:var(--good)}
+.status.err{color:var(--danger)}
+.tools{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:.8rem;color:var(--mute)}
+.link{color:var(--gold);cursor:pointer;text-decoration:underline}
 @media (max-width:480px){.addrow{flex-direction:column}.fields{grid-column:1 / 4}.net{grid-column:1 / 4}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>The Handicapped Fish Tank</h1>
+  <h1>♠ Poker Handicap Calculator</h1>
+  <p class="sub">Track tonight's players, buy-ins and winnings.</p>
 
   <div class="panel stack">
     <label class="lbl" for="stack">Buy-In Stack</label>
-    <span class="money"><span>$</span><input id="stack" type="number" min="0" step="any" value="50"></span>
+    <span class="money"><span>$</span><input id="stack" type="number" min="0" step="5" value="50"></span>
   </div>
 
   <div class="panel">
@@ -64,22 +71,78 @@ button{cursor:pointer;border:0;border-radius:10px;font-weight:700;font-size:.95r
 
   <div class="head"><h2>Players</h2><span class="count" id="count"></span></div>
   <div id="list"></div>
+
+  <div class="panel submit">
+    <button class="btn big" id="submitBtn">Submit game &amp; download game.json</button>
+    <div class="status" id="status"></div>
+    <div class="tools"><span id="gameCount"></span>
+      <label class="link">Load existing game.json<input type="file" id="importFile" accept=".json,application/json" hidden></label>
+    </div>
+  </div>
 </div>
 
 <script>
 // ---- state ----
 let players = []; // {id, name, playing, buyIn, winnings}
 let stack = 50;
+let games = []; // {game_id, date, results:[{player_id, player, buyin, winnings, handicap}]}
 const KEY = 'pokerHandicap.v1';
 
 function load(){
   try{
     const d = JSON.parse(localStorage.getItem(KEY) || 'null');
-    if(d){ players = d.players || []; stack = d.stack ?? 50; }
+    if(d){ players = d.players || []; stack = d.stack ?? 50; games = d.games || []; }
   }catch(e){}
 }
 function save(){
-  try{ localStorage.setItem(KEY, JSON.stringify({players, stack})); }catch(e){}
+  try{ localStorage.setItem(KEY, JSON.stringify({players, stack, games})); }catch(e){}
+}
+
+function setStatus(msg, err){
+  const s = $('status'); s.textContent = msg; s.className = 'status' + (err?' err':'');
+}
+function updateGameCount(){
+  $('gameCount').textContent = `${games.length} game${games.length===1?'':'s'} saved`;
+}
+function download(){
+  const blob = new Blob([JSON.stringify(games, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'game.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+}
+function submitGame(){
+  const active = players.filter(p=>p.playing);
+  if(!active.length){ setStatus('Tick at least one player first.', true); return; }
+  const nextId = games.reduce((m,g)=>Math.max(m, Number(g.game_id)||0), 0) + 1;
+  const game = {
+    game_id: nextId,
+    date: new Date().toISOString().slice(0,10),
+    results: active.map(p => ({
+      player_id: p.id,
+      player: p.name,
+      buyin: Number(p.buyIn) || 0,
+      winnings: Number(p.winnings) || 0,
+      handicap: computeHandicap(p)
+    }))
+  };
+  games.push(game);
+  // clear this game's entries ready for the next one
+  players.forEach(p => { p.playing = false; p.buyIn = ''; p.winnings = ''; });
+  save(); render(); updateGameCount(); download();
+  setStatus(`Game ${nextId} saved (${active.length} players). game.json downloaded.`);
+}
+function importGames(file){
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const d = JSON.parse(r.result);
+      if(!Array.isArray(d)) throw new Error('not an array');
+      games = d; save(); updateGameCount();
+      setStatus(`Loaded ${d.length} games from file.`);
+    }catch(e){ setStatus('That file is not a valid game.json.', true); }
+  };
+  r.readAsText(file);
 }
 
 // ---- HANDICAP FORMULA (placeholder — replace once defined) ----
@@ -159,9 +222,13 @@ list.addEventListener('input', e => {
   save();
 });
 
+$('submitBtn').onclick = submitGame;
+$('importFile').addEventListener('change', e => { if(e.target.files[0]) importGames(e.target.files[0]); e.target.value=''; });
+
 load();
 $('stack').value = stack;
 render();
+updateGameCount();
 </script>
 </body>
 </html>

@@ -1,20 +1,11 @@
-{
-    "games": [
-        {
-            "id": 1,
-            "date": "2024-01-10",
-            "results": [
-                { "player": "Jaiden", "buyIn": 50, "cashOut": 120 },
-                { "player": "Tom", "buyIn": 50, "cashOut": 0 }
-            ]
-        },
-        {
-            "id": 2,
-            "date": "2024-02-01",
-            "results": [
-                { "player": "Jaiden", "buyIn": 50, "cashOut": 80 },
-                { "player": "Sarah", "buyIn": 50, "cashOut": 30 }
-            ]
-        }
+[
+  {
+    "game_id": 1,
+    "date": "2026-10-10",
+    "results": [
+      { "player_id": "1", "player": "Smort", "buyin": 50, "winnings": 80, "handicap": 0 },
+      { "player_id": "2", "player": "Jaiden", "buyin": 50, "winnings": 0, "handicap": 0 },
+      { "player_id": "3", "player": "Tom", "buyin": 50, "winnings": 70, "handicap": 0 }
     ]
-}
+  }
+]
