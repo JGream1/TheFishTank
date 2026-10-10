@@ -12,7 +12,7 @@ box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:en
 *{box-sizing:border-box}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% 0,var(--bg2),var(--bg) 70%) fixed;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.wrap{max-width:760px;margin:0 auto;padding:24px 16px 48px}
+.wrap{max-width:860px;margin:0 auto;padding:24px 16px 48px}
 h1{font-family:Georgia,"Times New Roman",serif;font-size:1.9rem;margin:0 0 4px}
 .sub{color:var(--mute);margin:0 0 22px}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
@@ -45,6 +45,10 @@ button:disabled{opacity:.6;cursor:wait}
 .big{width:100%;padding:14px;font-size:1.05rem}
 .status{margin-top:10px;font-size:.9rem;color:var(--good)}
 .status:empty{display:none}
+.undo{text-align:right;margin-top:10px}
+.linkbtn{background:none;border:0;padding:0;font-size:.78rem;font-weight:500;color:var(--mute);text-decoration:underline;cursor:pointer}
+.linkbtn:hover{color:var(--danger)}
+td.nw,th.nw{white-space:nowrap}
 .status.err{color:var(--danger)}
 .banner{background:rgba(224,112,95,.15);border:1px solid var(--danger);color:var(--text);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:.9rem}
 .boards{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:28px}
@@ -86,6 +90,7 @@ td.rank{color:var(--gold);font-weight:700;width:1.6em}
   <div class="panel submit">
     <button class="btn big" id="submitBtn">Submit Game</button>
     <div class="status" id="status"></div>
+    <div class="undo"><button class="linkbtn" id="undoBtn">Undo Game Submission</button></div>
   </div>
 
   <div class="boards">
@@ -103,6 +108,7 @@ const SUPABASE_KEY = 'sb_publishable_UIMgrZdjeXEROfvrom5dLg_3SZlc7uH';   // the 
 const configured = !SUPABASE_URL.includes('YOUR-PROJECT') && !SUPABASE_KEY.includes('YOUR-ANON');
 let players = []; // {id, name, playing, buyIn, winnings}
 let stack = 50;
+let gamesById = {}; // games played per player id
 let netById = {};  // all-time net winnings per player id (from leaderboard_net)
 let hcById = {};   // computed handicap per ticked player id
 
@@ -185,7 +191,8 @@ async function loadBoards(){
     ]);
     $('lbNet').innerHTML = boardHtml(net);
     $('lbUn').innerHTML = boardHtml(un);
-    netById = {}; net.forEach(r => { netById[r.id] = Number(r.net) || 0; });
+    netById = {}; gamesById = {};
+    net.forEach(r => { netById[r.id] = Number(r.net) || 0; gamesById[r.id] = Number(r.games_played) || 0; });
     render();
   }catch(e){
     $('lbNet').textContent = $('lbUn').textContent = 'Could not load leaderboard.';
@@ -193,8 +200,12 @@ async function loadBoards(){
 }
 function boardHtml(rows){
   if(!rows.length) return '<div class="empty">No games yet.</div>';
-  return '<table><tr><th></th><th>Player</th><th class="r">Games</th><th class="r">Net</th></tr>' +
-    rows.map((r,i)=>`<tr><td class="rank">${i+1}</td><td>${esc(r.name)}</td><td class="r">${r.games_played}</td><td class="r ${cls(Number(r.net))}"><b>${fmt(Number(r.net))}</b></td></tr>`).join('') + '</table>';
+  return '<table><tr><th></th><th>Player</th><th class="r">Games</th><th class="r nw">Net</th><th class="r nw">Net/game</th></tr>' +
+    rows.map((r,i) => {
+      const net = Number(r.net), g = Number(r.games_played) || 0, per = g ? net / g : 0;
+      return `<tr><td class="rank">${i+1}</td><td>${esc(r.name)}</td><td class="r">${g}</td>` +
+        `<td class="r nw ${cls(net)}"><b>${fmt(net)}</b></td><td class="r nw ${cls(per)}">${fmt(per)}</td></tr>`;
+    }).join('') + '</table>';
 }
 
 // ---- render ----
@@ -204,7 +215,8 @@ function render(){
   if(!players.length){
     list.innerHTML = '<div class="empty">No players yet — add your first one above.</div>';
   } else {
-    list.innerHTML = players.map(p => {
+    const byGames = (a,b) => (gamesById[b.id]||0) - (gamesById[a.id]||0) || a.name.localeCompare(b.name);
+    list.innerHTML = [...players].sort(byGames).map(p => {
       const net = (Number(p.winnings)||0) - buyInFor(p);
       const h = computeHandicap(p);
       return `<div class="player ${p.playing?'':'off'}" data-id="${esc(p.id)}">
@@ -258,6 +270,19 @@ async function submitGame(){
   }finally{ btn.disabled = false; }
 }
 
+async function undoGame(){
+  try{
+    const rows = await api('games?select=id,played_on,results(player_id)&order=id.desc&limit=1');
+    if(!rows.length){ setStatus('There are no games to undo.', true); return; }
+    const g = rows[0], n = (g.results || []).length;
+    if(!confirm(`Remove game ${g.id} (${g.played_on}, ${n} player${n===1?'':'s'}) and all of its results? This can't be undone.`)) return;
+    const del = await api('games?id=eq.' + g.id, {method:'DELETE', headers:{Prefer:'return=representation'}});
+    if(!del || !del.length){ setStatus("Nothing was deleted. Run the delete policy SQL in Supabase first.", true); return; }
+    await loadBoards();
+    setStatus(`Game ${g.id} removed.`);
+  }catch(e){ setStatus('Could not undo: ' + e.message, true); }
+}
+$('undoBtn').onclick = undoGame;
 $('addBtn').onclick = addPlayer;
 $('newName').addEventListener('keydown', e => { if(e.key==='Enter') addPlayer(); });
 $('submitBtn').onclick = submitGame;
