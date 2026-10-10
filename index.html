@@ -1,19 +1,167 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Poker Handicap Calculator</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Poker Handicap Calculator</title>
+<style>
+:root{--bg:#0e2a20;--bg2:#143828;--card:#1b4633;--line:#2d6347;--text:#f1ece0;--mute:#9fbfae;--gold:#e3b650;--goldtxt:#2a1f00;--danger:#e0705f;--good:#7fd69a;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#e8f1ea;--bg2:#d9e8dd;--card:#fff;--line:#b9d1c1;--text:#14291f;--mute:#4f6b5b;--gold:#b8861b;--goldtxt:#fff;--danger:#b8402f;--good:#1f7a43}}
+:root[data-theme="light"]{--bg:#e8f1ea;--bg2:#d9e8dd;--card:#fff;--line:#b9d1c1;--text:#14291f;--mute:#4f6b5b;--gold:#b8861b;--goldtxt:#fff;--danger:#b8402f;--good:#1f7a43}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% 0,var(--bg2),var(--bg) 70%) fixed;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:24px 16px 48px}
+h1{font-family:Georgia,"Times New Roman",serif;font-size:1.9rem;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+.sub{color:var(--mute);margin:0 0 22px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+label.lbl{display:block;font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin-bottom:6px}
+.money{position:relative;display:block}
+.money span{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--mute);pointer-events:none}
+input[type=number],input[type=text]{width:100%;background:rgba(0,0,0,.18);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:1rem;outline:none}
+.money input{padding-left:26px}
+input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(227,182,80,.25)}
+.stack input{font-size:1.4rem;font-weight:600;max-width:220px}
+.addrow{display:flex;gap:10px}
+button{cursor:pointer;border:0;border-radius:10px;font-weight:700;font-size:.95rem}
+.btn{background:var(--gold);color:var(--goldtxt);padding:10px 18px;white-space:nowrap}
+.btn:hover{filter:brightness(1.08)}
+.ghost{background:none;color:var(--mute);padding:6px 10px;font-size:1.1rem}
+.ghost:hover{color:var(--danger)}
+.head{display:flex;justify-content:space-between;align-items:baseline;margin:6px 4px 10px}
+.head h2{margin:0;font-size:1.05rem;font-family:Georgia,serif}
+.count{color:var(--mute);font-size:.85rem}
+.player{display:grid;grid-template-columns:auto 1fr auto;gap:10px 14px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;transition:opacity .15s}
+.player.off{opacity:.55}
+.chk{width:26px;height:26px;accent-color:var(--gold);cursor:pointer}
+.name{font-weight:700;font-size:1.1rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.hc{font-size:.8rem;font-weight:700;background:rgba(227,182,80,.16);color:var(--gold);border:1px solid var(--gold);border-radius:999px;padding:2px 10px}
+.fields{grid-column:2 / 4;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fields label{font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);display:block;margin-bottom:4px}
+.net{grid-column:2 / 4;font-size:.85rem;color:var(--mute)}
+.pos{color:var(--good)}.neg{color:var(--danger)}
+.empty{text-align:center;color:var(--mute);padding:28px;border:1px dashed var(--line);border-radius:14px}
+@media (max-width:480px){.addrow{flex-direction:column}.fields{grid-column:1 / 4}.net{grid-column:1 / 4}}
+</style>
 </head>
 <body>
-  <h1>Poker Handicap Calculator</h1>
+<div class="wrap">
+  <h1>The Handicapped Fish Tank</h1>
 
-  <label>Base Buy-In: $</label>
-  <input id="baseBuyIn" type="number" value="50">
-  <button onclick="calculate()">Calculate Handicaps</button>
+  <div class="panel stack">
+    <label class="lbl" for="stack">Buy-In Stack</label>
+    <span class="money"><span>$</span><input id="stack" type="number" min="0" step="any" value="50"></span>
+  </div>
 
-  <h2>Handicap Results</h2>
-  <pre id="output">Click calculate…</pre>
+  <div class="panel">
+    <label class="lbl" for="newName">Add player</label>
+    <div class="addrow">
+      <input id="newName" type="text" placeholder="Player name" maxlength="40" autocomplete="off">
+      <button class="btn" id="addBtn">Add player</button>
+    </div>
+  </div>
 
-  <script src="scripts/app.js"></script>
+  <div class="head"><h2>Players</h2><span class="count" id="count"></span></div>
+  <div id="list"></div>
+</div>
+
+<script>
+// ---- state ----
+let players = []; // {id, name, playing, buyIn, winnings}
+let stack = 50;
+const KEY = 'pokerHandicap.v1';
+
+function load(){
+  try{
+    const d = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if(d){ players = d.players || []; stack = d.stack ?? 50; }
+  }catch(e){}
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify({players, stack})); }catch(e){}
+}
+
+// ---- HANDICAP FORMULA (placeholder — replace once defined) ----
+// Currently: net result (winnings − buy-in) measured in buy-in stacks.
+function computeHandicap(p){
+  const net = (Number(p.winnings)||0) - (Number(p.buyIn)||0);
+  return stack > 0 ? Math.round((net / stack) * 10) / 10 : 0;
+}
+
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => (n<0?'-':'') + '$' + Math.abs(n).toLocaleString(undefined,{maximumFractionDigits:2});
+
+function render(){
+  const list = $('list');
+  if(!players.length){
+    list.innerHTML = '<div class="empty">No players yet — add your first one above.</div>';
+  } else {
+    list.innerHTML = players.map(p => {
+      const net = (Number(p.winnings)||0) - (Number(p.buyIn)||0);
+      const h = computeHandicap(p);
+      return `<div class="player ${p.playing?'':'off'}" data-id="${p.id}">
+        <input class="chk" type="checkbox" data-f="playing" ${p.playing?'checked':''} aria-label="Playing: ${esc(p.name)}">
+        <div class="name">${esc(p.name)}<span class="hc" title="Handicap">HC ${h>0?'+':''}${h}</span></div>
+        <button class="ghost" data-del title="Remove player" aria-label="Remove ${esc(p.name)}">✕</button>
+        <div class="fields">
+          <div><label>Buy-in</label><span class="money"><span>$</span><input type="number" step="any" data-f="buyIn" placeholder="${stack}" value="${p.buyIn}"></span></div>
+          <div><label>Winnings</label><span class="money"><span>$</span><input type="number" step="any" data-f="winnings" placeholder="0" value="${p.winnings}"></span></div>
+        </div>
+        <div class="net">Net: <b class="${net>0?'pos':net<0?'neg':''}" data-net>${fmt(net)}</b></div>
+      </div>`;
+    }).join('');
+  }
+  const n = players.filter(p=>p.playing).length;
+  $('count').textContent = `${n} of ${players.length} playing`;
+}
+
+function addPlayer(){
+  const name = $('newName').value.trim();
+  if(!name) return;
+  players.push({id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), name, playing:true, buyIn:'', winnings:''});
+  $('newName').value=''; $('newName').focus();
+  save(); render();
+}
+
+$('addBtn').onclick = addPlayer;
+$('newName').addEventListener('keydown', e => { if(e.key==='Enter') addPlayer(); });
+$('stack').addEventListener('input', e => { stack = Number(e.target.value)||0; save(); render(); });
+
+const list = $('list');
+list.addEventListener('click', e => {
+  if(!e.target.closest('[data-del]')) return;
+  const id = e.target.closest('.player').dataset.id;
+  const p = players.find(x=>x.id===id);
+  if(p && confirm(`Remove ${p.name}?`)){ players = players.filter(x=>x.id!==id); save(); render(); }
+});
+list.addEventListener('change', e => {
+  if(e.target.dataset.f !== 'playing') return;
+  const p = players.find(x=>x.id===e.target.closest('.player').dataset.id);
+  p.playing = e.target.checked;
+  // pre-fill buy-in with the stack when someone joins the game
+  if(p.playing && p.buyIn==='') p.buyIn = stack;
+  save(); render();
+});
+// update values without re-rendering (keeps input focus)
+list.addEventListener('input', e => {
+  const f = e.target.dataset.f;
+  if(f!=='buyIn' && f!=='winnings') return;
+  const row = e.target.closest('.player');
+  const p = players.find(x=>x.id===row.dataset.id);
+  p[f] = e.target.value;
+  const net = (Number(p.winnings)||0) - (Number(p.buyIn)||0);
+  const h = computeHandicap(p);
+  const el = row.querySelector('[data-net]');
+  el.textContent = fmt(net); el.className = net>0?'pos':net<0?'neg':'';
+  row.querySelector('.hc').textContent = `HC ${h>0?'+':''}${h}`;
+  save();
+});
+
+load();
+$('stack').value = stack;
+render();
+</script>
 </body>
 </html>
