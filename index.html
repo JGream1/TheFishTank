@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Poker Handicap Calculator</title>
+<title>The Handicapped Fish Tank</title>
 <style>
 :root{--bg:#0e2a20;--bg2:#143828;--card:#1b4633;--line:#2d6347;--text:#f1ece0;--mute:#9fbfae;--gold:#e3b650;--goldtxt:#2a1f00;--danger:#e0705f;--good:#7fd69a;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -53,7 +53,7 @@ button{cursor:pointer;border:0;border-radius:10px;font-weight:700;font-size:.95r
 </head>
 <body>
 <div class="wrap">
-  <h1>♠ Poker Handicap Calculator</h1>
+  <h1>🐟 The Handicapped Fish Tank</h1>
   <p class="sub">Track tonight's players, buy-ins and winnings.</p>
 
   <div class="panel stack">
@@ -76,7 +76,7 @@ button{cursor:pointer;border:0;border-radius:10px;font-weight:700;font-size:.95r
     <button class="btn big" id="submitBtn">Submit Game</button>
     <div class="status" id="status"></div>
     <div class="tools"><span id="gameCount"></span>
-      <label class="link">Load existing game.json<input type="file" id="importFile" accept=".json,application/json" hidden></label>
+      <label class="link">Link / load game.json<input type="file" id="importFile" accept=".json,application/json" hidden></label>
     </div>
   </div>
 </div>
@@ -111,26 +111,66 @@ function download(){
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
 }
-function submitGame(){
+const hasFS = 'showOpenFilePicker' in window;
+let fileHandle = null;
+function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open('fishtank',1);
+  r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+async function idbGet(k){ const db=await idb(); return new Promise((res,rej)=>{ const q=db.transaction('kv').objectStore('kv').get(k); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
+async function idbSet(k,v){ const db=await idb(); return new Promise((res,rej)=>{ const t=db.transaction('kv','readwrite'); t.objectStore('kv').put(v,k); t.oncomplete=()=>res(); t.onerror=()=>rej(t.error); }); }
+async function pickFile(){
+  const [h] = await showOpenFilePicker({types:[{description:'JSON',accept:{'application/json':['.json']}}]});
+  fileHandle = h; try{ await idbSet('handle', h); }catch(e){}
+  return h;
+}
+async function ensurePerm(h){
+  const o = {mode:'readwrite'};
+  if(await h.queryPermission(o) === 'granted') return true;
+  return (await h.requestPermission(o)) === 'granted';
+}
+async function readHandle(h){
+  const t = await (await h.getFile()).text();
+  if(!t.trim()) return [];
+  const d = JSON.parse(t);
+  if(!Array.isArray(d)) throw new Error('game.json must contain a list of games');
+  return d;
+}
+async function submitGame(){
   const active = players.filter(p=>p.playing);
   if(!active.length){ setStatus('Tick at least one player first.', true); return; }
-  const nextId = games.reduce((m,g)=>Math.max(m, Number(g.game_id)||0), 0) + 1;
-  const game = {
-    game_id: nextId,
-    date: new Date().toISOString().slice(0,10),
-    results: active.map(p => ({
-      player_id: p.id,
-      player: p.name,
-      buyin: buyInFor(p),
-      winnings: Number(p.winnings) || 0,
-      handicap: computeHandicap(p)
-    }))
-  };
-  games.push(game);
-  // clear this game's entries ready for the next one
-  players.forEach(p => { p.playing = false; p.buyIn = ''; p.winnings = ''; });
-  save(); render(); updateGameCount(); download();
-  setStatus(`Game ${nextId} saved (${active.length} players). game.json downloaded.`);
+  try{
+    // sync with the real file first so game_id continues from what's in it
+    if(hasFS){
+      if(!fileHandle) await pickFile();
+      if(!await ensurePerm(fileHandle)) { setStatus('Permission to edit game.json was denied.', true); return; }
+      games = await readHandle(fileHandle);
+    }
+    const nextId = games.reduce((m,g)=>Math.max(m, Number(g.game_id)||0), 0) + 1;
+    const game = {
+      game_id: nextId,
+      date: new Date().toISOString().slice(0,10),
+      results: active.map(p => ({
+        player_id: p.id,
+        player: p.name,
+        buyin: buyInFor(p),
+        winnings: Number(p.winnings) || 0,
+        handicap: computeHandicap(p)
+      }))
+    };
+    games.push(game);
+    if(hasFS){
+      const w = await fileHandle.createWritable();
+      await w.write(JSON.stringify(games, null, 2)); await w.close();
+      setStatus(`Game ${nextId} added to ${fileHandle.name}.`);
+    } else {
+      download();
+      setStatus(`Game ${nextId} saved. This browser can't edit files directly, so an updated game.json was downloaded - replace your old one with it.`);
+    }
+    players.forEach(p => { p.playing = false; p.buyIn = ''; p.winnings = ''; });
+    save(); render(); updateGameCount();
+  }catch(e){
+    if(e && e.name === 'AbortError') setStatus('Cancelled - nothing was saved.', true);
+    else setStatus('Could not update game.json: ' + (e.message || e), true);
+  }
 }
 // Add any players found in the games that aren't already in the list
 function addPlayersFromGames(){
@@ -144,6 +184,20 @@ function applyGames(d){
 }
 // Auto-load game.json sitting next to this page (works when served over http/https)
 async function autoLoad(){
+  if(hasFS){
+    try{
+      const h = await idbGet('handle');
+      if(h){
+        fileHandle = h;
+        if(await h.queryPermission({mode:'readwrite'}) === 'granted'){
+          const d = await readHandle(h);
+          applyGames(d);
+          setStatus(`Loaded ${d.length} games and ${players.length} players from ${h.name}.`);
+          return;
+        }
+      }
+    }catch(e){}
+  }
   try{
     const res = await fetch('game.json', {cache:'no-store'});
     if(!res.ok) return;
@@ -172,9 +226,9 @@ function importGames(file){
 function computeHandicap(p){
   return 0;
 }
-// Default buy-in = Game Buy-In + handicap, unless the player's box was edited
+// Default buy-in = Game Buy-In - handicap, unless the player's box was edited
 function buyInFor(p){
-  return p.buyIn !== '' ? (Number(p.buyIn)||0) : stack + computeHandicap(p);
+  return p.buyIn !== '' ? (Number(p.buyIn)||0) : Math.max(0, stack - computeHandicap(p));
 }
 
 const $ = id => document.getElementById(id);
@@ -246,6 +300,17 @@ list.addEventListener('input', e => {
 });
 
 $('submitBtn').onclick = submitGame;
+document.querySelector('label.link').addEventListener('click', async e => {
+  if(!hasFS) return;
+  e.preventDefault();
+  try{
+    const h = await pickFile();
+    if(!await ensurePerm(h)){ setStatus('Permission to edit game.json was denied.', true); return; }
+    const d = await readHandle(h);
+    applyGames(d);
+    setStatus(`Linked ${h.name}: ${d.length} games and ${players.length} players loaded. Submit will update this file.`);
+  }catch(err){ if(!err || err.name!=='AbortError') setStatus('Could not read that file: ' + (err.message||err), true); }
+});
 $('importFile').addEventListener('change', e => { if(e.target.files[0]) importGames(e.target.files[0]); e.target.value=''; });
 
 load();
