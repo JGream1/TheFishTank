@@ -13,7 +13,7 @@ box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:en
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% 0,var(--bg2),var(--bg) 70%) fixed;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 .wrap{max-width:760px;margin:0 auto;padding:24px 16px 48px}
-h1{font-family:Georgia,"Times New Roman",serif;font-size:1.9rem;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+h1{font-family:Georgia,"Times New Roman",serif;font-size:1.9rem;margin:0 0 4px}
 .sub{color:var(--mute);margin:0 0 22px}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
 label.lbl{display:block;font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin-bottom:6px}
@@ -25,36 +25,46 @@ input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(227,182,80,.25)}
 .stack input{font-size:1.4rem;font-weight:600;max-width:220px}
 .addrow{display:flex;gap:10px}
 button{cursor:pointer;border:0;border-radius:10px;font-weight:700;font-size:.95rem}
+button:disabled{opacity:.6;cursor:wait}
 .btn{background:var(--gold);color:var(--goldtxt);padding:10px 18px;white-space:nowrap}
 .btn:hover{filter:brightness(1.08)}
-.ghost{background:none;color:var(--mute);padding:6px 10px;font-size:1.1rem}
-.ghost:hover{color:var(--danger)}
 .head{display:flex;justify-content:space-between;align-items:baseline;margin:6px 4px 10px}
 .head h2{margin:0;font-size:1.05rem;font-family:Georgia,serif}
 .count{color:var(--mute);font-size:.85rem}
-.player{display:grid;grid-template-columns:auto 1fr auto;gap:10px 14px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;transition:opacity .15s}
+.player{display:grid;grid-template-columns:auto 1fr;gap:10px 14px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;transition:opacity .15s}
 .player.off{opacity:.55}
 .chk{width:26px;height:26px;accent-color:var(--gold);cursor:pointer}
 .name{font-weight:700;font-size:1.1rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .hc{font-size:.8rem;font-weight:700;background:rgba(227,182,80,.16);color:var(--gold);border:1px solid var(--gold);border-radius:999px;padding:2px 10px}
-.fields{grid-column:2 / 4;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fields{grid-column:2;display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .fields label{font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);display:block;margin-bottom:4px}
-.net{grid-column:2 / 4;font-size:.85rem;color:var(--mute)}
+.net{grid-column:2;font-size:.85rem;color:var(--mute)}
 .pos{color:var(--good)}.neg{color:var(--danger)}
 .empty{text-align:center;color:var(--mute);padding:28px;border:1px dashed var(--line);border-radius:14px}
 .submit{text-align:center;margin-top:20px}
 .big{width:100%;padding:14px;font-size:1.05rem}
 .status{min-height:1.3em;margin-top:10px;font-size:.9rem;color:var(--good)}
 .status.err{color:var(--danger)}
-.tools{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:.8rem;color:var(--mute)}
-.link{color:var(--gold);cursor:pointer;text-decoration:underline}
-@media (max-width:480px){.addrow{flex-direction:column}.fields{grid-column:1 / 4}.net{grid-column:1 / 4}}
+.banner{background:rgba(224,112,95,.15);border:1px solid var(--danger);color:var(--text);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:.9rem}
+.boards{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:28px}
+.board{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.board h3{margin:0 0 2px;font-family:Georgia,serif;font-size:1.05rem}
+.board p{margin:0 0 10px;color:var(--mute);font-size:.8rem}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+td,th{padding:7px 4px;border-top:1px solid var(--line);text-align:left}
+th{font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);border-top:0}
+td.r,th.r{text-align:right}
+td.rank{color:var(--gold);font-weight:700;width:1.6em}
+@media (max-width:640px){.boards{grid-template-columns:1fr}}
+@media (max-width:480px){.addrow{flex-direction:column}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>🐟 The Handicapped Fish Tank</h1>
   <p class="sub">Track tonight's players, buy-ins and winnings.</p>
+
+  <div class="banner" id="banner" hidden>Add your Supabase project URL and anon key at the top of the script in this file to connect the database.</div>
 
   <div class="panel stack">
     <label class="lbl" for="stack">Game Buy-In</label>
@@ -75,153 +85,41 @@ button{cursor:pointer;border:0;border-radius:10px;font-weight:700;font-size:.95r
   <div class="panel submit">
     <button class="btn big" id="submitBtn">Submit Game</button>
     <div class="status" id="status"></div>
-    <div class="tools"><span id="gameCount"></span>
-      <label class="link">Link / load game.json<input type="file" id="importFile" accept=".json,application/json" hidden></label>
-    </div>
+  </div>
+
+  <div class="boards">
+    <div class="board"><h3>Net Winnings</h3><p>Winnings minus total buy-ins</p><div id="lbNet"></div></div>
+    <div class="board"><h3>Unhandicapped</h3><p>Winnings minus buy-ins without handicap</p><div id="lbUn"></div></div>
   </div>
 </div>
 
 <script>
-// ---- state ----
+// ===== CONNECT YOUR SUPABASE PROJECT =====
+const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
+const SUPABASE_KEY = 'YOUR-ANON-KEY';   // the public "anon" key only
+// =========================================
+
+const configured = !SUPABASE_URL.includes('YOUR-PROJECT') && !SUPABASE_KEY.includes('YOUR-ANON');
 let players = []; // {id, name, playing, buyIn, winnings}
 let stack = 50;
-let games = []; // {game_id, date, results:[{player_id, player, buyin, winnings, handicap}]}
-const KEY = 'pokerHandicap.v1';
 
-function load(){
-  try{
-    const d = JSON.parse(localStorage.getItem(KEY) || 'null');
-    if(d){ players = d.players || []; stack = d.stack ?? 50; games = d.games || []; }
-  }catch(e){}
-}
-function save(){
-  try{ localStorage.setItem(KEY, JSON.stringify({players, stack, games})); }catch(e){}
-}
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => (n<0?'-':'') + '$' + Math.abs(n).toLocaleString(undefined,{maximumFractionDigits:2});
+const cls = n => n>0?'pos':n<0?'neg':'';
 
-function setStatus(msg, err){
-  const s = $('status'); s.textContent = msg; s.className = 'status' + (err?' err':'');
+async function api(path, opts = {}){
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    ...opts,
+    headers: {apikey:SUPABASE_KEY, Authorization:'Bearer '+SUPABASE_KEY, 'Content-Type':'application/json', ...(opts.headers||{})}
+  });
+  if(!res.ok) throw new Error((await res.text()) || res.statusText);
+  const t = await res.text();
+  return t ? JSON.parse(t) : null;
 }
-function updateGameCount(){
-  $('gameCount').textContent = `${games.length} game${games.length===1?'':'s'} saved`;
-}
-function download(){
-  const blob = new Blob([JSON.stringify(games, null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = 'game.json';
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
-}
-const hasFS = 'showOpenFilePicker' in window;
-let fileHandle = null;
-function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open('fishtank',1);
-  r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
-async function idbGet(k){ const db=await idb(); return new Promise((res,rej)=>{ const q=db.transaction('kv').objectStore('kv').get(k); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
-async function idbSet(k,v){ const db=await idb(); return new Promise((res,rej)=>{ const t=db.transaction('kv','readwrite'); t.objectStore('kv').put(v,k); t.oncomplete=()=>res(); t.onerror=()=>rej(t.error); }); }
-async function pickFile(){
-  const [h] = await showOpenFilePicker({types:[{description:'JSON',accept:{'application/json':['.json']}}]});
-  fileHandle = h; try{ await idbSet('handle', h); }catch(e){}
-  return h;
-}
-async function ensurePerm(h){
-  const o = {mode:'readwrite'};
-  if(await h.queryPermission(o) === 'granted') return true;
-  return (await h.requestPermission(o)) === 'granted';
-}
-async function readHandle(h){
-  const t = await (await h.getFile()).text();
-  if(!t.trim()) return [];
-  const d = JSON.parse(t);
-  if(!Array.isArray(d)) throw new Error('game.json must contain a list of games');
-  return d;
-}
-async function submitGame(){
-  const active = players.filter(p=>p.playing);
-  if(!active.length){ setStatus('Tick at least one player first.', true); return; }
-  try{
-    // sync with the real file first so game_id continues from what's in it
-    if(hasFS){
-      if(!fileHandle) await pickFile();
-      if(!await ensurePerm(fileHandle)) { setStatus('Permission to edit game.json was denied.', true); return; }
-      games = await readHandle(fileHandle);
-    }
-    const nextId = games.reduce((m,g)=>Math.max(m, Number(g.game_id)||0), 0) + 1;
-    const game = {
-      game_id: nextId,
-      date: new Date().toISOString().slice(0,10),
-      results: active.map(p => ({
-        player_id: p.id,
-        player: p.name,
-        buyin: buyInFor(p),
-        winnings: Number(p.winnings) || 0,
-        handicap: computeHandicap(p)
-      }))
-    };
-    games.push(game);
-    if(hasFS){
-      const w = await fileHandle.createWritable();
-      await w.write(JSON.stringify(games, null, 2)); await w.close();
-      setStatus(`Game ${nextId} added to ${fileHandle.name}.`);
-    } else {
-      download();
-      setStatus(`Game ${nextId} saved. This browser can't edit files directly, so an updated game.json was downloaded - replace your old one with it.`);
-    }
-    players.forEach(p => { p.playing = false; p.buyIn = ''; p.winnings = ''; });
-    save(); render(); updateGameCount();
-  }catch(e){
-    if(e && e.name === 'AbortError') setStatus('Cancelled - nothing was saved.', true);
-    else setStatus('Could not update game.json: ' + (e.message || e), true);
-  }
-}
-// Add any players found in the games that aren't already in the list
-function addPlayersFromGames(){
-  games.forEach(g => (g.results||[]).forEach(r => {
-    if(r.player_id && !players.some(p=>p.id===r.player_id))
-      players.push({id:r.player_id, name:r.player, playing:false, buyIn:'', winnings:''});
-  }));
-}
-function applyGames(d){
-  games = d; addPlayersFromGames(); save(); render(); updateGameCount();
-}
-// Auto-load game.json sitting next to this page (works when served over http/https)
-async function autoLoad(){
-  if(hasFS){
-    try{
-      const h = await idbGet('handle');
-      if(h){
-        fileHandle = h;
-        if(await h.queryPermission({mode:'readwrite'}) === 'granted'){
-          const d = await readHandle(h);
-          applyGames(d);
-          setStatus(`Loaded ${d.length} games and ${players.length} players from ${h.name}.`);
-          return;
-        }
-      }
-    }catch(e){}
-  }
-  try{
-    const res = await fetch('game.json', {cache:'no-store'});
-    if(!res.ok) return;
-    const d = await res.json();
-    if(Array.isArray(d) && d.length >= games.length){
-      applyGames(d);
-      setStatus(`Loaded ${d.length} games and ${players.length} players from game.json.`);
-    }
-  }catch(e){}
-}
-function importGames(file){
-  const r = new FileReader();
-  r.onload = () => {
-    try{
-      const d = JSON.parse(r.result);
-      if(!Array.isArray(d)) throw new Error('not an array');
-      applyGames(d);
-      setStatus(`Loaded ${d.length} games and ${players.length} players from file.`);
-    }catch(e){ setStatus('That file is not a valid game.json.', true); }
-  };
-  r.readAsText(file);
-}
+function setStatus(msg, err){ const s=$('status'); s.textContent=msg; s.className='status'+(err?' err':''); }
 
-// ---- HANDICAP FORMULA (placeholder — replace once defined) ----
+// ---- HANDICAP FORMULA (placeholder) ----
 // Handicap is $0 for everyone for now.
 function computeHandicap(p){
   return 0;
@@ -231,10 +129,30 @@ function buyInFor(p){
   return p.buyIn !== '' ? (Number(p.buyIn)||0) : Math.max(0, stack - computeHandicap(p));
 }
 
-const $ = id => document.getElementById(id);
-const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt = n => (n<0?'-':'') + '$' + Math.abs(n).toLocaleString(undefined,{maximumFractionDigits:2});
+// ---- data ----
+async function loadPlayers(){
+  const rows = await api('players?select=id,name&order=name.asc');
+  players = rows.map(r => ({id:r.id, name:r.name, playing:true, buyIn:'', winnings:''}));
+}
+async function loadBoards(){
+  try{
+    const [net, un] = await Promise.all([
+      api('leaderboard_net?select=*&order=net.desc'),
+      api('leaderboard_unhandicapped?select=*&order=net.desc')
+    ]);
+    $('lbNet').innerHTML = boardHtml(net);
+    $('lbUn').innerHTML = boardHtml(un);
+  }catch(e){
+    $('lbNet').textContent = $('lbUn').textContent = 'Could not load leaderboard.';
+  }
+}
+function boardHtml(rows){
+  if(!rows.length) return '<div class="empty">No games yet.</div>';
+  return '<table><tr><th></th><th>Player</th><th class="r">Games</th><th class="r">Net</th></tr>' +
+    rows.map((r,i)=>`<tr><td class="rank">${i+1}</td><td>${esc(r.name)}</td><td class="r">${r.games_played}</td><td class="r ${cls(Number(r.net))}"><b>${fmt(Number(r.net))}</b></td></tr>`).join('') + '</table>';
+}
 
+// ---- render ----
 function render(){
   const list = $('list');
   if(!players.length){
@@ -243,15 +161,14 @@ function render(){
     list.innerHTML = players.map(p => {
       const net = (Number(p.winnings)||0) - buyInFor(p);
       const h = computeHandicap(p);
-      return `<div class="player ${p.playing?'':'off'}" data-id="${p.id}">
+      return `<div class="player ${p.playing?'':'off'}" data-id="${esc(p.id)}">
         <input class="chk" type="checkbox" data-f="playing" ${p.playing?'checked':''} aria-label="Playing: ${esc(p.name)}">
         <div class="name">${esc(p.name)}<span class="hc" title="Handicap">HC ${h>0?'+':''}${h}</span></div>
-        <button class="ghost" data-del title="Remove player" aria-label="Remove ${esc(p.name)}">✕</button>
         <div class="fields">
           <div><label>Buy-in</label><span class="money"><span>$</span><input type="number" step="5" data-f="buyIn" value="${buyInFor(p)}"></span></div>
           <div><label>Winnings</label><span class="money"><span>$</span><input type="number" step="5" data-f="winnings" placeholder="0" value="${p.winnings}"></span></div>
         </div>
-        <div class="net">Net: <b class="${net>0?'pos':net<0?'neg':''}" data-net>${fmt(net)}</b></div>
+        <div class="net">Net: <b class="${cls(net)}" data-net>${fmt(net)}</b></div>
       </div>`;
     }).join('');
   }
@@ -259,30 +176,57 @@ function render(){
   $('count').textContent = `${n} of ${players.length} playing`;
 }
 
-function addPlayer(){
+// ---- actions ----
+async function addPlayer(){
   const name = $('newName').value.trim();
   if(!name) return;
-  players.push({id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), name, playing:true, buyIn:'', winnings:''});
-  $('newName').value=''; $('newName').focus();
-  save(); render();
+  const id = Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  try{
+    await api('players', {method:'POST', headers:{Prefer:'return=minimal'}, body: JSON.stringify({id, name})});
+    players.push({id, name, playing:true, buyIn:'', winnings:''});
+    $('newName').value=''; $('newName').focus();
+    render();
+  }catch(e){ setStatus('Could not add player: ' + e.message, true); }
+}
+
+async function submitGame(){
+  const active = players.filter(p=>p.playing);
+  if(!active.length){ setStatus('Tick at least one player first.', true); return; }
+  const btn = $('submitBtn'); btn.disabled = true;
+  try{
+    const [game] = await api('games', {method:'POST', headers:{Prefer:'return=representation'},
+      body: JSON.stringify({played_on: new Date().toLocaleDateString('en-CA')})});
+    const rows = active.map(p => ({
+      game_id: game.id,
+      player_id: p.id,
+      buyin: buyInFor(p),
+      winnings: Number(p.winnings) || 0,
+      handicap: computeHandicap(p)
+    }));
+    await api('results', {method:'POST', headers:{Prefer:'return=minimal'}, body: JSON.stringify(rows)});
+    players.forEach(p => { p.playing = true; p.buyIn = ''; p.winnings = ''; });
+    render(); loadBoards();
+    setStatus(`Game ${game.id} saved (${active.length} players).`);
+  }catch(e){
+    setStatus('Could not save game: ' + e.message, true);
+  }finally{ btn.disabled = false; }
 }
 
 $('addBtn').onclick = addPlayer;
 $('newName').addEventListener('keydown', e => { if(e.key==='Enter') addPlayer(); });
-$('stack').addEventListener('input', e => { stack = Number(e.target.value)||0; save(); render(); });
+$('submitBtn').onclick = submitGame;
+$('stack').addEventListener('input', e => {
+  stack = Number(e.target.value)||0;
+  try{ localStorage.setItem('fishtank.stack', stack); }catch(err){}
+  render();
+});
 
 const list = $('list');
-list.addEventListener('click', e => {
-  if(!e.target.closest('[data-del]')) return;
-  const id = e.target.closest('.player').dataset.id;
-  const p = players.find(x=>x.id===id);
-  if(p && confirm(`Remove ${p.name}?`)){ players = players.filter(x=>x.id!==id); save(); render(); }
-});
 list.addEventListener('change', e => {
   if(e.target.dataset.f !== 'playing') return;
   const p = players.find(x=>x.id===e.target.closest('.player').dataset.id);
   p.playing = e.target.checked;
-  save(); render();
+  render();
 });
 // update values without re-rendering (keeps input focus)
 list.addEventListener('input', e => {
@@ -292,33 +236,24 @@ list.addEventListener('input', e => {
   const p = players.find(x=>x.id===row.dataset.id);
   p[f] = e.target.value;
   const net = (Number(p.winnings)||0) - buyInFor(p);
-  const h = computeHandicap(p);
   const el = row.querySelector('[data-net]');
-  el.textContent = fmt(net); el.className = net>0?'pos':net<0?'neg':'';
-  row.querySelector('.hc').textContent = `HC ${h>0?'+':''}${h}`;
-  save();
+  el.textContent = fmt(net); el.className = cls(net);
 });
 
-$('submitBtn').onclick = submitGame;
-document.querySelector('label.link').addEventListener('click', async e => {
-  if(!hasFS) return;
-  e.preventDefault();
+// ---- init ----
+(async function init(){
+  try{ const s = localStorage.getItem('fishtank.stack'); if(s!==null) stack = Number(s)||0; }catch(e){}
+  $('stack').value = stack;
+  if(!configured){ $('banner').hidden = false; render(); return; }
   try{
-    const h = await pickFile();
-    if(!await ensurePerm(h)){ setStatus('Permission to edit game.json was denied.', true); return; }
-    const d = await readHandle(h);
-    applyGames(d);
-    setStatus(`Linked ${h.name}: ${d.length} games and ${players.length} players loaded. Submit will update this file.`);
-  }catch(err){ if(!err || err.name!=='AbortError') setStatus('Could not read that file: ' + (err.message||err), true); }
-});
-$('importFile').addEventListener('change', e => { if(e.target.files[0]) importGames(e.target.files[0]); e.target.value=''; });
-
-load();
-addPlayersFromGames();
-$('stack').value = stack;
-render();
-updateGameCount();
-autoLoad();
+    await loadPlayers();
+    render();
+    loadBoards();
+  }catch(e){
+    setStatus('Could not load from Supabase: ' + e.message, true);
+    render();
+  }
+})();
 </script>
 </body>
 </html>
