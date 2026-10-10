@@ -250,6 +250,18 @@ async function addPlayer(){
 async function submitGame(){
   const active = players.filter(p=>p.playing);
   if(!active.length){ setStatus('Tick at least one player first.', true); return; }
+  // buy-ins and winnings must balance before anything is saved
+  const totalIn = active.reduce((a,p) => a + buyInFor(p), 0);
+  const totalOut = active.reduce((a,p) => a + (Number(p.winnings) || 0), 0);
+  if(Math.abs(totalIn - totalOut) > 0.005){
+    const diff = totalOut - totalIn;
+    alert(`Buy-ins and winnings don't match, so nothing was submitted.\n\n` +
+      `Total buy-ins: ${fmt(totalIn)}\nTotal winnings: ${fmt(totalOut)}\n` +
+      `Difference: ${diff>0?'winnings are ':'buy-ins are '}${fmt(Math.abs(diff))} higher\n\n` +
+      `Check every player's buy-in (including rebuys) and winnings, then try again.`);
+    setStatus('Not submitted: buy-ins and winnings do not match.', true);
+    return;
+  }
   const btn = $('submitBtn'); btn.disabled = true;
   try{
     const [game] = await api('games', {method:'POST', headers:{Prefer:'return=representation'},
