@@ -41,9 +41,10 @@ button:disabled{opacity:.6;cursor:wait}
 .net{grid-column:2;font-size:.85rem;color:var(--mute)}
 .pos{color:var(--good)}.neg{color:var(--danger)}
 .empty{text-align:center;color:var(--mute);padding:28px;border:1px dashed var(--line);border-radius:14px}
-.submit{text-align:center;margin-top:20px;padding:20px}
+.submit{text-align:center;margin-top:20px}
 .big{width:100%;padding:14px;font-size:1.05rem}
-.status{min-height:1.3em;margin-top:10px;font-size:.9rem;color:var(--good)}
+.status{margin-top:10px;font-size:.9rem;color:var(--good)}
+.status:empty{display:none}
 .status.err{color:var(--danger)}
 .banner{background:rgba(224,112,95,.15);border:1px solid var(--danger);color:var(--text);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:.9rem}
 .boards{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:28px}
@@ -95,13 +96,15 @@ td.rank{color:var(--gold);font-weight:700;width:1.6em}
 
 <script>
 // ===== CONNECT YOUR SUPABASE PROJECT =====
-const SUPABASE_URL = 'https://suwpiqycxwswtqdsrkuw.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_UIMgrZdjeXEROfvrom5dLg_3SZlc7uH';   // the public "anon" key only
+const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
+const SUPABASE_KEY = 'YOUR-ANON-KEY';   // the public "anon" key only
 // =========================================
 
 const configured = !SUPABASE_URL.includes('YOUR-PROJECT') && !SUPABASE_KEY.includes('YOUR-ANON');
 let players = []; // {id, name, playing, buyIn, winnings}
 let stack = 50;
+let netById = {};  // all-time net winnings per player id (from leaderboard_net)
+let hcById = {};   // computed handicap per ticked player id
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -109,9 +112,12 @@ const fmt = n => (n<0?'-':'') + '$' + Math.abs(n).toLocaleString(undefined,{maxi
 const cls = n => n>0?'pos':n<0?'neg':'';
 
 async function api(path, opts = {}){
-  const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+  // tolerate a trailing slash or a pasted "/rest/v1" on the project URL
+  const base = SUPABASE_URL.trim().replace(/\/+$/, '').replace(/\/rest\/v1$/, '');
+  const res = await fetch(base + '/rest/v1/' + path, {
     ...opts,
-    headers: {apikey:SUPABASE_KEY, Authorization:'Bearer '+SUPABASE_KEY, 'Content-Type':'application/json', ...(opts.headers||{})}
+    // legacy anon keys are JWTs (start "eyJ") and go in both headers; new sb_publishable_ keys go in apikey only
+    headers: {apikey:SUPABASE_KEY, ...(SUPABASE_KEY.startsWith('eyJ') ? {Authorization:'Bearer '+SUPABASE_KEY} : {}), 'Content-Type':'application/json', ...(opts.headers||{})}
   });
   if(!res.ok) throw new Error((await res.text()) || res.statusText);
   const t = await res.text();
@@ -119,14 +125,50 @@ async function api(path, opts = {}){
 }
 function setStatus(msg, err){ const s=$('status'); s.textContent=msg; s.className='status'+(err?' err':''); }
 
-// ---- HANDICAP FORMULA (placeholder) ----
-// Handicap is $0 for everyone for now.
-function computeHandicap(p){
-  return 0;
+// ---- HANDICAP FORMULA ----
+// Target buy-in = Game Buy-In + player's all-time net winnings, held between 0.5x and 1.5x the Game Buy-In.
+// Because the ticked players may not net to zero, everyone is shifted by the same amount (re-capping as needed)
+// so the buy-ins total [players] x Game Buy-In, then rounded to $5 with the total preserved.
+// Handicap = adjusted buy-in - Game Buy-In (positive = pays more).
+function computeAllHandicaps(){
+  hcById = {};
+  const act = players.filter(p => p.playing);
+  const n = act.length;
+  if(!n || stack <= 0) return;
+  const G = stack, lo = 0.5*G, hi = 1.5*G, U = 5;
+  const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
+  const t = act.map(p => G + (netById[p.id] || 0));
+  const total = n * G;
+
+  // 1) shift everyone equally (clamped) until the buy-ins sum to the total
+  let a = lo - Math.max(...t), b = hi - Math.min(...t);
+  const sumAt = sh => t.reduce((acc,v) => acc + clamp(v + sh, lo, hi), 0);
+  for(let i=0; i<60; i++){ const m=(a+b)/2; if(sumAt(m) < total) a=m; else b=m; }
+  const x = t.map(v => clamp(v + (a+b)/2, lo, hi));
+
+  // 2) round to $5, fixing the total by moving single $5 steps (largest remainder), staying within the caps
+  const T = Math.round(total / U);
+  const loU = Math.ceil(lo/U - 1e-9), hiU = Math.floor(hi/U + 1e-9);
+  const y = x.map(v => v / U);
+  const r = y.map(v => clamp(Math.floor(v + 1e-9), loU, hiU));
+  let R = T - r.reduce((p,c) => p + c, 0), guard = 0;
+  while(R !== 0 && guard++ < 1000){
+    const idx = r.map((_,i) => i);
+    if(R > 0){
+      const c = idx.filter(i => r[i] < hiU).sort((i,j) => (y[j]-r[j]) - (y[i]-r[i]))[0];
+      if(c === undefined) break; r[c]++; R--;
+    } else {
+      const c = idx.filter(i => r[i] > loU).sort((i,j) => (y[i]-r[i]) - (y[j]-r[j]))[0];
+      if(c === undefined) break; r[c]--; R++;
+    }
+  }
+  act.forEach((p,i) => { hcById[p.id] = r[i]*U - G; });
 }
-// Default buy-in = Game Buy-In - handicap, unless the player's box was edited
+function computeHandicap(p){ return p.playing ? (hcById[p.id] || 0) : 0; }
+const fmtHC = h => h === 0 ? '$0' : (h>0 ? '+' : '-') + '$' + Math.abs(h);
+// Default buy-in = Game Buy-In + handicap, unless the player's box was edited
 function buyInFor(p){
-  return p.buyIn !== '' ? (Number(p.buyIn)||0) : Math.max(0, stack - computeHandicap(p));
+  return p.buyIn !== '' ? (Number(p.buyIn)||0) : Math.max(0, stack + computeHandicap(p));
 }
 
 // ---- data ----
@@ -142,6 +184,8 @@ async function loadBoards(){
     ]);
     $('lbNet').innerHTML = boardHtml(net);
     $('lbUn').innerHTML = boardHtml(un);
+    netById = {}; net.forEach(r => { netById[r.id] = Number(r.net) || 0; });
+    render();
   }catch(e){
     $('lbNet').textContent = $('lbUn').textContent = 'Could not load leaderboard.';
   }
@@ -154,6 +198,7 @@ function boardHtml(rows){
 
 // ---- render ----
 function render(){
+  computeAllHandicaps();
   const list = $('list');
   if(!players.length){
     list.innerHTML = '<div class="empty">No players yet — add your first one above.</div>';
@@ -163,7 +208,7 @@ function render(){
       const h = computeHandicap(p);
       return `<div class="player ${p.playing?'':'off'}" data-id="${esc(p.id)}">
         <input class="chk" type="checkbox" data-f="playing" ${p.playing?'checked':''} aria-label="Playing: ${esc(p.name)}">
-        <div class="name">${esc(p.name)}<span class="hc" title="Handicap">HC ${h>0?'+':''}${h}</span></div>
+        <div class="name">${esc(p.name)}${p.playing ? `<span class="hc" title="Handicap">HC ${fmtHC(h)}</span>` : ''}</div>
         <div class="fields">
           <div><label>Buy-in</label><span class="money"><span>$</span><input type="number" step="5" data-f="buyIn" value="${buyInFor(p)}"></span></div>
           <div><label>Winnings</label><span class="money"><span>$</span><input type="number" step="5" data-f="winnings" placeholder="0" value="${p.winnings}"></span></div>
@@ -245,13 +290,22 @@ list.addEventListener('input', e => {
   try{ const s = localStorage.getItem('fishtank.stack'); if(s!==null) stack = Number(s)||0; }catch(e){}
   $('stack').value = stack;
   if(!configured){ $('banner').hidden = false; render(); return; }
-  try{
-    await loadPlayers();
-    render();
-    loadBoards();
-  }catch(e){
-    setStatus('Could not load from Supabase: ' + e.message, true);
-    render();
+  for(let attempt = 1; attempt <= 3; attempt++){
+    try{
+      await loadPlayers();
+      setStatus('');
+      render();
+      loadBoards();
+      return;
+    }catch(e){
+      const network = e instanceof TypeError; // fetch never reached the API
+      setStatus(network
+        ? `Can't reach Supabase (attempt ${attempt}/3). Check your connection, ad blocker/VPN, or whether the project is paused.`
+        : 'Could not load from Supabase: ' + e.message, true);
+      render();
+      if(!network) return;
+      await new Promise(r => setTimeout(r, 1500));
+    }
   }
 })();
 </script>
