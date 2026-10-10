@@ -126,43 +126,44 @@ async function api(path, opts = {}){
 function setStatus(msg, err){ const s=$('status'); s.textContent=msg; s.className='status'+(err?' err':''); }
 
 // ---- HANDICAP FORMULA ----
-// Target buy-in = Game Buy-In + player's all-time net winnings, held between 0.5x and 1.5x the Game Buy-In.
-// Because the ticked players may not net to zero, everyone is shifted by the same amount (re-capping as needed)
-// so the buy-ins total [players] x Game Buy-In, then rounded to $5 with the total preserved.
-// Handicap = adjusted buy-in - Game Buy-In (positive = pays more).
+// Each player's handicap follows their all-time net winnings: positive net -> pays more, negative net -> pays less.
+// Rules: handicap is capped at +/-0.5x the Game Buy-In (buy-in stays between 0.5x and 1.5x), and it can never be
+// bigger than the player's own net winnings (or lower than their net losses).
+// Total buy-ins must equal [players] x Game Buy-In, so the handicaps must sum to $0: everyone's net is shifted by
+// the same amount (then re-capped) until they do, and the result is rounded to $5 keeping the sum at $0.
 function computeAllHandicaps(){
   hcById = {};
   const act = players.filter(p => p.playing);
-  const n = act.length;
-  if(!n || stack <= 0) return;
-  const G = stack, lo = 0.5*G, hi = 1.5*G, U = 5;
+  if(!act.length || stack <= 0) return;
+  const G = stack, cap = 0.5*G, U = 5;
   const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
-  const t = act.map(p => G + (netById[p.id] || 0));
-  const total = n * G;
+  const net = act.map(p => netById[p.id] || 0);
+  const lo = net.map(v => Math.min(0, Math.max(-cap, v)));   // losers: down to their net loss, at most -cap
+  const hi = net.map(v => Math.max(0, Math.min(cap, v)));    // winners: up to their net win, at most +cap
 
-  // 1) shift everyone equally (clamped) until the buy-ins sum to the total
-  let a = lo - Math.max(...t), b = hi - Math.min(...t);
-  const sumAt = sh => t.reduce((acc,v) => acc + clamp(v + sh, lo, hi), 0);
-  for(let i=0; i<60; i++){ const m=(a+b)/2; if(sumAt(m) < total) a=m; else b=m; }
-  const x = t.map(v => clamp(v + (a+b)/2, lo, hi));
+  // 1) find the shift that makes the handicaps sum to zero
+  const M = Math.max(...net.map(Math.abs)) + cap + 1;
+  let a = -M, b = M;
+  const sumAt = sh => net.reduce((acc,v,i) => acc + clamp(v + sh, lo[i], hi[i]), 0);
+  for(let i=0; i<60; i++){ const m=(a+b)/2; if(sumAt(m) < 0) a=m; else b=m; }
+  const x = net.map((v,i) => clamp(v + (a+b)/2, lo[i], hi[i]));
 
-  // 2) round to $5, fixing the total by moving single $5 steps (largest remainder), staying within the caps
-  const T = Math.round(total / U);
-  const loU = Math.ceil(lo/U - 1e-9), hiU = Math.floor(hi/U + 1e-9);
+  // 2) round to $5 (in $5 units), then move single $5 steps so the total is exactly zero, within each player's limits
+  const loU = lo.map(v => Math.ceil(v/U - 1e-9)), hiU = hi.map(v => Math.floor(v/U + 1e-9));
   const y = x.map(v => v / U);
-  const r = y.map(v => clamp(Math.floor(v + 1e-9), loU, hiU));
-  let R = T - r.reduce((p,c) => p + c, 0), guard = 0;
+  const r = y.map((v,i) => clamp(Math.floor(v + 1e-9), loU[i], hiU[i]));
+  let R = -r.reduce((p,c) => p + c, 0), guard = 0;
   while(R !== 0 && guard++ < 1000){
     const idx = r.map((_,i) => i);
     if(R > 0){
-      const c = idx.filter(i => r[i] < hiU).sort((i,j) => (y[j]-r[j]) - (y[i]-r[i]))[0];
+      const c = idx.filter(i => r[i] < hiU[i]).sort((i,j) => (y[j]-r[j]) - (y[i]-r[i]))[0];
       if(c === undefined) break; r[c]++; R--;
     } else {
-      const c = idx.filter(i => r[i] > loU).sort((i,j) => (y[i]-r[i]) - (y[j]-r[j]))[0];
+      const c = idx.filter(i => r[i] > loU[i]).sort((i,j) => (y[i]-r[i]) - (y[j]-r[j]))[0];
       if(c === undefined) break; r[c]--; R++;
     }
   }
-  act.forEach((p,i) => { hcById[p.id] = r[i]*U - G; });
+  act.forEach((p,i) => { hcById[p.id] = r[i]*U; });
 }
 function computeHandicap(p){ return p.playing ? (hcById[p.id] || 0) : 0; }
 const fmtHC = h => h === 0 ? '$0' : (h>0 ? '+' : '-') + '$' + Math.abs(h);
