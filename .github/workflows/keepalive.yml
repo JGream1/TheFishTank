@@ -1,13 +1,21 @@
-name: Debug
+name: Keep Supabase Alive
 
 on:
+  schedule:
+    - cron: "0 */6 * * *"
   workflow_dispatch:
 
 jobs:
-  debug:
+  keepalive:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Show constructed URL
+      - name: Ping Supabase
         run: |
-          echo "${{ secrets.SUPABASE_URL }}/rest/v1/world_cup_odds?select=id&limit=1"
+          curl --fail --show-error --silent \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/world_cup_odds?select=id&limit=1"
+
+      - name: Confirm success
+        run: echo "Supabase ping completed successfully"
