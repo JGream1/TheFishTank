@@ -1,21 +1,13 @@
-name: Test Secrets
+name: Debug
 
 on:
   workflow_dispatch:
 
 jobs:
-  test:
+  debug:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check URL exists
+      - name: Show constructed URL
         run: |
-          echo "URL length: ${#SUPABASE_URL}"
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-
-      - name: Check key exists
-        run: |
-          echo "KEY length: ${#SUPABASE_ANON_KEY}"
-        env:
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          echo "${{ secrets.SUPABASE_URL }}/rest/v1/world_cup_odds?select=id&limit=1"
