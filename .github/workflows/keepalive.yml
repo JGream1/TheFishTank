@@ -13,7 +13,8 @@ jobs:
       - name: Ping Supabase
         run: |
           curl --fail --show-error --silent \
-            "${{ secrets.SUPABASE_URL }}"
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/players?select=id&limit=1"
 
       - name: Confirm success
         run: echo "Supabase ping completed successfully"
