@@ -13,9 +13,7 @@ jobs:
       - name: Ping Supabase
         run: |
           curl --fail --show-error --silent \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/world_cup_odds?select=id&limit=1"
+            "${{ secrets.SUPABASE_URL }}"
 
       - name: Confirm success
         run: echo "Supabase ping completed successfully"
